@@ -31,7 +31,7 @@ uint32_t task0_per = 7200000; // millisecs 7.2м = 2ч
 
 
 void setup() {
-  Serial.begin(9600);
+//  Serial.begin(9600);
 
   pinMode(MOSFET_PIN, OUTPUT);
 
@@ -68,17 +68,20 @@ void isr() {
 }
 
 bool is_glass_full() {
-  static uint32_t tmr;
-  digitalWrite(sensorPower, HIGH);
-  if (millis () - tmr >= 1) {
-    tmr = millis();
+//  static uint32_t tmr;
+//  digitalWrite(sensorPower, HIGH);
+//  if (millis () - tmr >= 1) {
+//    tmr = millis();
+//    int val = analogRead(sensorPin);
+//    digitalWrite(sensorPower, LOW);
+//    is_full = (val > 100) ? 1 : 0;
+////    Serial.println(is_full);
+
+    digitalWrite(sensorPower, HIGH);
     int val = analogRead(sensorPin);
     digitalWrite(sensorPower, LOW);
-//    Serial.print("is full: ");
     is_full = (val > 100) ? 1 : 0;
-    Serial.println(is_full);
     return is_full;
-  }
 }
 
 void requestWaterDisp() {
@@ -128,18 +131,25 @@ void countdownScreen(byte secs) {
     disp.clear();
 }
 
+void pour_with_check() {
+  is_full = is_glass_full();
+  if (is_full) {
+    pour(5);
+  }
+}
+
 void pour(byte val) {
     analogWrite(MOSFET_PIN, 255);
     countdownScreen(val);
     analogWrite(MOSFET_PIN, 0);
 }
 
+void start_pour(void) {
+    analogWrite(MOSFET_PIN, 255);
+}
 
-void pour_with_check() {
-  is_full = is_glass_full();
-  if (is_full) {
-    pour(5);
-  }
+void stop_pour(void) {
+    analogWrite(MOSFET_PIN, 0);
 }
 
 //  static byte my_counter;
@@ -179,18 +189,42 @@ void loop() {
   if (interruptFlag) {
     printLastPourTimePassed(timeHrs, timeMins);
     butt2.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
-    bool is_hold = butt2.state();
+    bool is_hold = butt2.state();  // если была нажата, то сбрасываем таймер
 
     // слушаем кнопку прерывания
     // полить вручную и перезагрузить таймер полива
     // если нажата пока воды нет, то выводим сообщение
-    if (is_hold && is_glass_full()) {
-      pour(4);
+        
+    while (butt2.state() && is_glass_full()) {
+      start_pour();
+      butt2.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
+    }
+    stop_pour();
+    if (is_hold) {
       OS.stop(0);
       OS.start(0);
-    } else if (is_hold && !is_glass_full()) {
+    }
+    if (is_hold && !is_glass_full()) {
       requestWaterDisp();
     }
     interruptFlag = false;
   }
+
+// works
+//  if (interruptFlag) {
+//    printLastPourTimePassed(timeHrs, timeMins);
+//    butt2.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
+//    bool is_hold = butt2.state();
+//    bool is_full = is_glass_full();
+//    
+//    if (is_hold && is_full) {
+//      pour(4);
+//      OS.stop(0);
+//      OS.start(0);
+//    } else if (is_hold && !is_full) {
+//      requestWaterDisp();
+//    }
+//    interruptFlag = false;
+//  }
+
 }
