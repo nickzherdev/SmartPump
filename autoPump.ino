@@ -1,5 +1,5 @@
 /*
-   AlexGyver Technologies https://alexgyver.ru/
+   Nikolay Zherdev
 */
 
 #define CLK 4
@@ -68,15 +68,6 @@ void isr() {
 }
 
 bool is_glass_full() {
-//  static uint32_t tmr;
-//  digitalWrite(sensorPower, HIGH);
-//  if (millis () - tmr >= 1) {
-//    tmr = millis();
-//    int val = analogRead(sensorPin);
-//    digitalWrite(sensorPower, LOW);
-//    is_full = (val > 100) ? 1 : 0;
-////    Serial.println(is_full);
-
     digitalWrite(sensorPower, HIGH);
     int val = analogRead(sensorPin);
     digitalWrite(sensorPower, LOW);
@@ -152,18 +143,6 @@ void stop_pour(void) {
     analogWrite(MOSFET_PIN, 0);
 }
 
-//  static byte my_counter;
-//  static uint32_t tmr2 = 0;
-//// to print twice
-//    while (my_counter < 2) {
-//      if (millis () - tmr2 >= 10000) {
-//        pour(5);
-//        tmr2 = millis();
-//        my_counter += 1;
-
-//    my_counter = 0;
-//  }
-
 void loop() {
   OS.tick(); // вызывать как можно чаще, задачи выполняются здесь
   
@@ -209,22 +188,4 @@ void loop() {
     }
     interruptFlag = false;
   }
-
-// works
-//  if (interruptFlag) {
-//    printLastPourTimePassed(timeHrs, timeMins);
-//    butt2.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
-//    bool is_hold = butt2.state();
-//    bool is_full = is_glass_full();
-//    
-//    if (is_hold && is_full) {
-//      pour(4);
-//      OS.stop(0);
-//      OS.start(0);
-//    } else if (is_hold && !is_full) {
-//      requestWaterDisp();
-//    }
-//    interruptFlag = false;
-//  }
-
 }
