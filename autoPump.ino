@@ -13,7 +13,9 @@
 #include "GyverTM1637.h"
 #include "GyverButton.h"
 #include <GyverOS.h>
-#include <GyverPower.h>
+
+  // uncomment if on battery
+//#include <GyverPower.h>
 
 GyverOS<1> OS;  // указать макс. количество задач
 
@@ -26,21 +28,25 @@ static volatile bool is_full = false;
 int value = 0;
 uint32_t Now, clocktimer;
 boolean flag;
-volatile boolean interruptFlag = false;   // флаг прерывания
-uint32_t task0_per = 7200000; // millisecs 7.2м = 2ч
 
+  // CHANGE TO FALSE IF ON BATTERY
+volatile boolean interruptFlag = false;   // флаг прерывания
+uint32_t task0_per = 86400000; // millisecs - 24ч
+//uint32_t task0_per = 20000; // millisecs - 20 sec
+int g_pour_time_sec = 7;
 
 void setup() {
-//  Serial.begin(9600);
+  Serial.begin(9600);
 
   pinMode(MOSFET_PIN, OUTPUT);
 
   // LOW_PULL  - кнопка подключена к VCC, пин подтянут к GND
   butt2.setType(LOW_PULL);
 
-  pinMode(sensorPower, OUTPUT);
+  // uncomment if on battery
+//  pinMode(sensorPower, OUTPUT);
   // Устанавливаем низкий уровень, чтобы на датчик не подавалось питание
-  digitalWrite(sensorPower, LOW);
+//  digitalWrite(sensorPower, LOW);
 
   disp.clear();
   disp.brightness(1);  // яркость, 0 - 7 (минимум - максимум)
@@ -52,25 +58,28 @@ void setup() {
 //  OS.attach(1, warn_fill_water, 10000);
 //  OS.stop(1);
 
+  // uncomment if on battery
   // подключаем прерывание на пин D3 (Arduino NANO)
-  attachInterrupt(1, isr, RISING);
+//  attachInterrupt(1, isr, RISING);
 
 // глубокий сон
 //  power.setSleepMode(POWERDOWN_SLEEP);
 }
 
+  // uncomment if on battery
 // обработчик аппаратного прерывания
-void isr() {
-  // дёргаем за функцию "проснуться"
-  // без неё проснёмся чуть позже (через 0-8 секунд)
-  power.wakeUp();
-  interruptFlag = true;   // подняли флаг прерывания
-}
+//void isr() {
+//  // дёргаем за функцию "проснуться"
+//  // без неё проснёмся чуть позже (через 0-8 секунд)
+//  power.wakeUp();
+//  interruptFlag = true;   // подняли флаг прерывания
+//}
 
 bool is_glass_full() {
     digitalWrite(sensorPower, HIGH);
     int val = analogRead(sensorPin);
     digitalWrite(sensorPower, LOW);
+    Serial.println(val);
     is_full = (val > 100) ? 1 : 0;
     return is_full;
 }
@@ -80,24 +89,24 @@ void requestWaterDisp() {
                            _i,
                            _O, _t, _O, _i, _d, _i
                           };
-  disp.runningString(welcome_banner, sizeof(welcome_banner), 350);  // 200 это время в миллисекундах!
+  disp.runningString(welcome_banner, sizeof(welcome_banner), 350);  // millisenconds
 }
 
 void printLastPourTimePassed(int hours, int mins) {
   byte last_pour_time[] = {_L, _A, _S, _t, _empty,
 //                           _P, _O, _U, _r, _empty,
                           };
-  disp.runningString(last_pour_time, sizeof(last_pour_time), 150);  // 350 это время в миллисекундах!
+  disp.runningString(last_pour_time, sizeof(last_pour_time), 250);  // millisenconds
 
   Now = millis();
-  while (millis () - Now <= 400) {   // показывать время полсекунды
+  while (millis () - Now <= 500) {   // показывать время полсекунды
         disp.displayClock(hours, mins);
   }
 
   byte continue_appr[] = {_H, _o, _l, _d,
     // _P, _r, _E, _S, _S,
                          };
-  disp.runningString(continue_appr, sizeof(continue_appr), 150);  // 350 это время в миллисекундах!
+  disp.runningString(continue_appr, sizeof(continue_appr), 250);  // millisenconds
 }
 
 void countdownScreen(byte secs) {
@@ -125,14 +134,14 @@ void countdownScreen(byte secs) {
 void pour_with_check() {
   is_full = is_glass_full();
   if (is_full) {
-    pour(5);
+    pour(g_pour_time_sec);
   }
 }
 
 void pour(byte val) {
-    analogWrite(MOSFET_PIN, 255);
+    start_pour();
     countdownScreen(val);
-    analogWrite(MOSFET_PIN, 0);
+    stop_pour();
 }
 
 void start_pour(void) {
@@ -145,9 +154,11 @@ void stop_pour(void) {
 
 void loop() {
   OS.tick(); // вызывать как можно чаще, задачи выполняются здесь
-  
+  butt2.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
+
+  // uncomment if on battery
   // OS.getLeft() возвращает время в мс до ближайшей задачи
-  power.sleepDelay(OS.getLeft());
+//  power.sleepDelay(OS.getLeft());
 
   // Здесь правильнее было бы искать время не до ближайшей задачи, 
   // а до следующего вызова текущей задачи
@@ -165,25 +176,30 @@ void loop() {
   prMillis = prMillis / 60;
   byte timeHrs = prMillis;
 
+    // comment out if on battery
+  if (butt2.isClick()) interruptFlag = true;
+
   if (interruptFlag) {
     printLastPourTimePassed(timeHrs, timeMins);
     butt2.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
     bool is_hold = butt2.state();  // если была нажата, то сбрасываем таймер
 
     // слушаем кнопку прерывания
-    // полить вручную и перезагрузить таймер полива
-    // если нажата пока воды нет, то выводим сообщение
+    // полить вручную
         
-    while (butt2.state() && is_glass_full()) {
+    while (butt2.state()) {  // && is_glass_full() on usb power suddenly stops working
       start_pour();
       butt2.tick();  // обязательная функция отработки. Должна постоянно опрашиваться
     }
     stop_pour();
+    // если кнопка была нажата, то перезагрузить таймер полива
     if (is_hold) {
       OS.stop(0);
       OS.start(0);
     }
+    // если нажата пока воды нет, то выводим сообщение
     if (is_hold && !is_glass_full()) {
+      stop_pour();
       requestWaterDisp();
     }
     interruptFlag = false;
